@@ -66,5 +66,3 @@ save_preprocessed_data(cfg.PROCESSED_FILE_PATH, process_data)
 formatted_data = convert_preprocessed_data(cfg.PROCESSED_FILE_PATH)
 save_preprocessed_data(cfg.PROCESSED_FILE_PATH, formatted_data)
 
-for sender, message in formatted_data:
-    print(f"[{sender}] {message}")
