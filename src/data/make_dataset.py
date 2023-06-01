@@ -12,7 +12,7 @@ def preprocessed_personal_talk_file(file_path):
 
     processed_data = []
     for sender, _, message in tqdm(messages):
-        if sender == cfg.SENDER:
+        if sender in cfg.NB_SENDERS:
             sender = 'Q'
         elif sender == cfg.RECEIVER:
             sender = 'A'
@@ -35,7 +35,8 @@ def convert_preprocessed_data(file_path):
     lines = data.split("\n")
     formatted_data = []
     current_sender = None
-    current_message = ""
+    current_message = []
+    q_count = 0
 
     for line in lines:
         if line.startswith("[Q]"):
@@ -51,13 +52,18 @@ def convert_preprocessed_data(file_path):
             current_sender = sender
 
         if current_sender == sender:
-            current_message += " " + message
+            current_message.append(message)
+            if sender == "Q":
+                q_count += 1
+                if q_count > 5:
+                    current_message.pop(0)
         else:
-            formatted_data.append((current_sender, current_message.strip()))
+            formatted_data.append((current_sender, " ".join(current_message)))
             current_sender = sender
-            current_message = message
+            current_message = [message]
+            q_count = 1 if sender == "Q" else 0
 
-    formatted_data.append((current_sender, current_message.strip()))
+    formatted_data.append((current_sender, " ".join(current_message)))
     return formatted_data
 
 
@@ -65,4 +71,3 @@ process_data = preprocessed_personal_talk_file(cfg.RAW_FILE_PATH)
 save_preprocessed_data(cfg.PROCESSED_FILE_PATH, process_data)
 formatted_data = convert_preprocessed_data(cfg.PROCESSED_FILE_PATH)
 save_preprocessed_data(cfg.PROCESSED_FILE_PATH, formatted_data)
-
