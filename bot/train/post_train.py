@@ -3,7 +3,6 @@ from bot.train.loss import CELoss
 from tqdm import tqdm
 import torch
 
-
 def post_train(post_model, post_dataloader, optimizer, scheduler):
     for epoch in range(pcfg.epochs):
         print(f"{epoch} epoch start")
@@ -44,8 +43,12 @@ def post_train(post_model, post_dataloader, optimizer, scheduler):
                 original_token_indexs.append(original_token_index)
 
             mlm_loss = 0
-            for corrupt_mask_output, original_token_index in zip(corrupt_mask_outputs, original_token_indexs):
-                mlm_loss += CELoss(corrupt_mask_output, torch.tensor(original_token_index).cuda())
+            for corrupt_mask_output, original_token_index in zip(
+                corrupt_mask_outputs, original_token_indexs
+            ):
+                mlm_loss += CELoss(
+                    corrupt_mask_output, torch.tensor(original_token_index).cuda()
+                )
             urc_loss = CELoss(urc_cls_outputs, batch_urc_labels)
 
             loss_val = mlm_loss + urc_loss
@@ -55,5 +58,5 @@ def post_train(post_model, post_dataloader, optimizer, scheduler):
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-    model_name = f"post_model_{epoch}.pth"
-    SaveModel(post_model, ".", model_name)
+
+    SaveModel(post_model, ".")

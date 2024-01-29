@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
 
 from bot.config.config import fcfg as cfg
-from bot.data.fine_loader_new import FineLoader
+from bot.data.fine_loader import FineLoader
 from bot.models.fine_model import FineModel
 from bot.train.fine_train import fine_train
 
@@ -13,7 +13,7 @@ train_dataloader = DataLoader(
     train_dataset,
     batch_size=4,
     shuffle=False,
-    num_workers=8,
+    num_workers=4,
     collate_fn=train_dataset.collate_fn,
 )
 
@@ -23,12 +23,12 @@ dev_dataloader = DataLoader(
     dev_dataset,
     batch_size=4,
     shuffle=False,
-    num_workers=8,
+    num_workers=4,
     collate_fn=dev_dataset.collate_fn,
 )
 
 fine_model = FineModel().cuda()
-fine_model.load_state_dict(torch.load("post_model.pth"), strict=False)
+fine_model.load_state_dict(torch.load("post_model.pt"), strict=False)
 num_training_steps = len(train_dataset) * cfg.epochs
 num_warmup_steps = len(train_dataset)
 optimizer = torch.optim.AdamW(fine_model.parameters(), lr=cfg.lr)

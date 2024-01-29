@@ -1,7 +1,6 @@
 from torch.nn.functional import softmax
 from tqdm import tqdm
 
-
 def CalP1(fine_model, dataloader):
     fine_model.eval()
     correct = 0

@@ -1,11 +1,12 @@
 import torch.nn as nn
 from transformers import AutoTokenizer, RobertaForMaskedLM
 
-
 class FineModel(nn.Module):
     def __init__(self):
         super(FineModel, self).__init__()
-        self.model = RobertaForMaskedLM.from_pretrained("klue/roberta-base", max_length=512)
+        self.model = RobertaForMaskedLM.from_pretrained(
+            "klue/roberta-base", max_length=512
+        )
         self.hiddenDim = self.model.config.hidden_size
 
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -20,7 +21,7 @@ class FineModel(nn.Module):
         self.W2 = nn.Linear(self.hiddenDim, 2)
 
     def forward(self, batch_input_tokens, batch_input_attentions):
-        # Binary Classification (pointwise)
+        ## Binary Classification (pointwise)
         outputs = self.model(
             batch_input_tokens,
             attention_mask=batch_input_attentions,

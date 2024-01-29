@@ -12,9 +12,10 @@ pickle_file_path = "candidates.pkl"
 
 fine_model = FineModel().to("cuda")
 fine_model.load_state_dict(torch.load("fine_model.pth"), strict=False)
-context = ["너는 취미가 뭐니", "취미? 없는데 이제 만들러 가야지"]
+context = ["저메추"]
 with open(pickle_file_path, "rb") as file:
     candidates = pickle.load(file)
+
 
 
 context_token = [fine_model.tokenizer.cls_token_id]
@@ -22,7 +23,6 @@ for utt in context:
     context_token += fine_model.tokenizer.encode(utt, add_special_tokens=False)
     context_token += [fine_model.tokenizer.sep_token_id]
 
-print(len(context_token))
 session_tokens = []
 for response in tqdm(candidates):
     response_token = [fine_model.tokenizer.eos_token_id]

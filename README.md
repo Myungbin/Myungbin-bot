@@ -21,12 +21,11 @@ The method `load_and_process_data` is crucial for reading and extracting convers
 2. **Regex Pattern Matching**: Each line is parsed using a regular expression pattern `r"\[(.*?)\] \[(.*?)\] (.*)"`. This pattern extracts the speaker, timestamp, and message from each line, mimicking the typical KakaoTalk message format.
 3. **Data Structuring**: The extracted data are structured into tuples of (speaker, time, message) and stored in a list named `conversations`.
 
-#### PreprocessChat
-The `preprocess_chat` static method performs three critical functions:
+#### Message Merging and Trimming
+The `merge_and_trim_messages` static method performs two critical functions:
 
-1. **Speaker Segmentation**: Differentiates messages based on the speaker, ensuring that each conversation chunk is attributed to the correct individual.
-2. **Conversation Chunking**: Organizes messages into chunks for easier processing, with a default chunk size of 10 messages.
-3. **Message Combination**: Concatenates consecutive messages from the same speaker into a single message for contextual coherence.
+1. **Merging Messages**: Conversational messages are merged based on their continuity and relevance, providing a coherent context for each dialogue chunk.
+2. **Trimming**: Messages are trimmed to ensure they meet specific criteria, maintaining a minimum word count (`min_length`) and a maximum total length (`max_total_length`). This process helps in reducing noise and focusing on the relevant parts of the conversation.
 
 These preprocessing steps are fundamental in transforming raw chat logs into a structured format suitable for the deep learning models employed in the Myungbin-bot project. By replicating the nuances of real-world conversations, the model can generate more accurate and contextually relevant responses.
 
@@ -55,14 +54,4 @@ These preprocessing steps are fundamental in transforming raw chat logs into a s
 These models play a pivotal role in enabling Myungbin-bot to process, understand, and generate responses based on conversational data. `PostModel` is primarily used for understanding and predicting elements within a conversation, while `FineModel` is tailored towards classifying or making binary decisions about the processed data. The integration of these models allows Myungbin-bot to handle complex conversational scenarios effectively.
 
 ### Inference Process
-After setting up and training Myungbin-bot, you can use it to evaluate and select the most appropriate responses for a given context. The following step illustrates how to load a trained model, process conversation data, and determine the best response candidates. This step assumes you have a pre-trained model and a set of candidate responses.
-
-#### Running the Evaluation and Selection Process
-
-1. **Loading Candidate Responses**: The `load_candidates` function reads a list of potential responses from a pickle file, ensuring no duplicates.
-
-2. **Tokenizing the Context**: `tokenize_context` tokenizes the conversation context using the model's tokenizer.
-
-3. **Evaluating Candidates**: The `evaluate_candidates` function takes the tokenized context and a list of response candidates, and evaluates each candidate's suitability using the model. It processes the candidates in batches for efficiency.
-
-4. **Selecting Top Candidates**: Finally, `select_top_candidates` ranks the evaluated candidates based on their suitability scores and selects the top ones.
+the inference process for generating and evaluating potential responses is carried out using the FineModel. This model, trained for binary classification, is used to predict the suitability of various responses to a given context

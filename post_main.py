@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
 
 from bot.config.config import pcfg
-from bot.data.post_loader_new import PostLoader
+from bot.data.post_loader import PostLoader
 from bot.models.post_model import PostModel
 from bot.train.post_train import post_train
 
@@ -16,7 +16,7 @@ post_dataloader = DataLoader(
     collate_fn=post_dataset.collate_fn,
 )
 post_model = PostModel().cuda()
-post_model.load_state_dict(torch.load("post_model.pth"))
+
 num_training_steps = len(post_dataset) * pcfg.epochs
 num_warmup_steps = len(post_dataset)
 

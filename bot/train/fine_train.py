@@ -33,6 +33,6 @@ def fine_train(fine_model, train_dataloader, dev_dataloader, optimizer, schedule
         print(f"Epoch: {epoch}번째 모델 성능(p@1): {p1}")
         if p1 > best_p1:
             best_p1 = p1
-            model_name = f"fine_model_{epoch}.pth"
             print(f"BEST 성능(p@1): {best_p1}")
-            SaveModel(fine_model, ".", model_name)
+            SaveModel(fine_model, ".")
+            

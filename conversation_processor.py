@@ -3,7 +3,6 @@ import json
 import random
 from collections import defaultdict
 
-
 class ConversationProcessor:
     def __init__(self, file_path, pattern=r"\[(.*?)\] \[(.*?)\] (.*)"):
         self.file_path = file_path
@@ -22,35 +21,32 @@ class ConversationProcessor:
 
         return conversations
 
-    def process_chat_combined_speaker(self, conversations):
-        processed_data = []
-        current_chunk = []
-        last_speaker = None
-        combined_message = ""
+    def merge_messages(self, min_length=5, max_total_length=100, short_message_merge=False):
+        reformatted_data = []
+        conversation = []
+        current_message = ""
 
-        for i in range(len(conversations)):
-            speaker, _, message = conversations[i]
-            if speaker != last_speaker:
-                if combined_message:
-                    current_chunk.append(combined_message)
-                combined_message = f"{message}"
-                last_speaker = speaker
-            else:
-                combined_message += f" {message}"
-            # When the chunk has 10 messages, add it to the data and start a new chunk
-            if len(current_chunk) == 10:
-                processed_data.append(current_chunk)
-                current_chunk = []
+        for i, (_, _, message) in enumerate(self.conversations):
+            current_message = f"{current_message} {message}".strip()
 
-        # Add the current combined message if it's not empty
-        if combined_message:
-            current_chunk.append(combined_message)
+            if len(current_message.split()) >= min_length or i == len(self.conversations) - 1:
+                if len(current_message) > max_total_length and not short_message_merge:
+                    words = current_message.split()
+                    trimmed_message = ' '.join(words[:min_length])
+                    conversation.append(trimmed_message)
+                    current_message = ' '.join(words[min_length:])
+                else:
+                    conversation.append(current_message)
+                    current_message = ""
 
-        # Add the last chunk to processed data if it has messages
-        if current_chunk:
-            processed_data.append(current_chunk)
+            if len(conversation) == 10:
+                reformatted_data.append(conversation)
+                conversation = []
 
-        return processed_data
+        if conversation:
+            reformatted_data.append(conversation)
+
+        return reformatted_data
 
     def generate_training_data(self, dataset, output_path, neg_nums=4, use_turns=5):
         train_json = defaultdict(dict)
@@ -69,20 +65,18 @@ class ConversationProcessor:
                 train_json[count]['negative_responses'] = negative_candidates
                 count += 1
 
-        with open(output_path, 'w', encoding='utf-8') as outfile:
-            json.dump(train_json, outfile)
-
+        # with open(output_path, 'w', encoding='utf-8') as outfile:
+        #     json.dump(train_json, outfile)
 
 if __name__ == "__main__":
-    data_path = "data/processed/all_group.txt"
+    data_path = "data/raw/all_group.txt"
     processor = ConversationProcessor(data_path)
-    session_dataset = processor.process_chat_combined_speaker(
-        processor.conversations)
-    print(session_dataset)
-    # train_ratio = 0.8
-    # split_index = int(len(session_dataset) * train_ratio)
-    # train_session = session_dataset[:split_index]
-    # valid_session = session_dataset[split_index:]
+    session_dataset = processor.merge_messages()
 
-    # processor.generate_training_data(train_session, 'train.json')
-    # processor.generate_training_data(valid_session, 'dev.json')
+    train_ratio = 0.8
+    split_index = int(len(session_dataset) * train_ratio)
+    train_session = session_dataset[:split_index]
+    valid_session = session_dataset[split_index:]
+
+    processor.generate_training_data(train_session, 'train.json')
+    processor.generate_training_data(valid_session, 'dev.json')
