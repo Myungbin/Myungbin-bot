@@ -7,8 +7,7 @@ from transformers import AutoTokenizer
 
 class FineLoader(Dataset):
     def __init__(self, data_path):
-        self.tokenizer = AutoTokenizer.from_pretrained('klue/roberta-base',
-                                                       padding="max_length", max_length=32, truncation=True)
+        self.tokenizer = AutoTokenizer.from_pretrained('klue/roberta-base')
         special_tokens = {'sep_token': '<SEP>'}
         self.tokenizer.add_special_tokens(special_tokens)
         

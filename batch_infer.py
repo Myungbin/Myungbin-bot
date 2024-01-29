@@ -67,8 +67,8 @@ if __name__ == "__main__":
     # 메인 코드
     pickle_file_path = "candidates_new1.pkl"
     fine_model = FineModel().to("cuda")
-    fine_model.load_state_dict(torch.load("fine_model.pth"), strict=False)
-    context = ["점메추"]
+    fine_model.load_state_dict(torch.load("fine_model_7.pth"), strict=False)
+    context = ["오늘 저녁 뭐먹지?"]
 
     candidates = load_candidates(pickle_file_path)
     context_token = tokenize_context(fine_model, context)
@@ -78,4 +78,4 @@ if __name__ == "__main__":
     # 선택된 상위 후보 출력
     print(context)
     for utt, prob in top_candidates:
-        print(utt, "##", round(prob, 3))
+        print(utt, ":", round(prob, 3))

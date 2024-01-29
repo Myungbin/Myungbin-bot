@@ -2,21 +2,18 @@ import random
 import re
 
 import torch
-from torch.utils.data import  Dataset
+from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 
 
 class PostLoader(Dataset):
     def __init__(self, data_path):
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "klue/roberta-base", turncation=True, padding="max_length", max_length=128
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained("klue/roberta-base")
         special_tokens = {"sep_token": "<SEP>"}
         self.tokenizer.add_special_tokens(special_tokens)
 
         self.data_path = data_path
-        
+
         conversations = self.load_and_process_data(self.data_path)
         session_dataset = self.preprocess_chat(conversations)
 
@@ -57,8 +54,9 @@ class PostLoader(Dataset):
 
         return conversations
 
-
     def preprocess_chat(self, conversations):
+        max_chunk_length = 10
+        context_overlap = 2
         processed_data = []
         current_chunk = []
         last_speaker = None
@@ -66,24 +64,23 @@ class PostLoader(Dataset):
 
         for i in range(len(conversations)):
             speaker, _, message = conversations[i]
-            if speaker != last_speaker:
-                if combined_message:
-                    current_chunk.append(combined_message)
-                combined_message = f"{message}"
-                last_speaker = speaker
+            if speaker != last_speaker and combined_message:
+                current_chunk.append(f"{speaker}_start: {combined_message}")
+                combined_message = message
             else:
-                combined_message += f" {message}"
-            if len(current_chunk) == 10:
-                processed_data.append(current_chunk)
-                current_chunk = []
+                combined_message += f" {message}" if combined_message else message
 
-        if combined_message:
-            current_chunk.append(combined_message)
+            if len(current_chunk) >= max_chunk_length:  # max_chunk_length는 설정에 따라 조정
+                processed_data.append(current_chunk)
+                current_chunk = current_chunk[-context_overlap:]  # context_overlap은 유지하고 싶은 문맥 길이
+
+            last_speaker = speaker
 
         if current_chunk:
             processed_data.append(current_chunk)
 
         return processed_data
+
 
     def __len__(self):  # 기본적인 구성
         return len(self.short_session_dataset)
@@ -95,12 +92,9 @@ class PostLoader(Dataset):
         self.corrupt_tokens = []
         self.output_tokens = []
         for i, utt in enumerate(session):
-            original_token = self.tokenizer.encode(utt,
-                                                   add_special_tokens=False,
-                                                   truncation=True,
-                                                   max_length=128)
+            original_token = self.tokenizer.encode(utt, add_special_tokens=False, truncation=True, max_length=64)
 
-            mask_num = int(len(original_token)*mask_ratio)
+            mask_num = int(len(original_token) * mask_ratio)
             mask_positions = random.sample([x for x in range(len(original_token))], mask_num)
             corrupt_token = []
             for pos in range(len(original_token)):
@@ -109,26 +103,26 @@ class PostLoader(Dataset):
                 else:
                     corrupt_token.append(original_token[pos])
 
-            if i == len(session)-1:
+            if i == len(session) - 1:
                 self.output_tokens += original_token
                 self.corrupt_tokens += corrupt_token
             else:
                 self.output_tokens += original_token + [self.tokenizer.sep_token_id]
-                self.corrupt_tokens += corrupt_token + [self.tokenizer.sep_token_id]    
-        
+                self.corrupt_tokens += corrupt_token + [self.tokenizer.sep_token_id]
+
         """ label for loss """
         self.corrupt_mask_positions = []
         for pos in range(len(self.corrupt_tokens)):
             if self.corrupt_tokens[pos] == self.tokenizer.mask_token_id:
-                self.corrupt_mask_positions.append(pos)                
-                
+                self.corrupt_mask_positions.append(pos)
+
         """ URC 입력 """
         urc_tokens = []
         context_utts = []
         for i in range(len(session)):
-            utt = session[i]    
-            original_token = self.tokenizer.encode(utt, add_special_tokens=False, max_length=128, truncation=True)
-            if i == len(session)-1:
+            utt = session[i]
+            original_token = self.tokenizer.encode(utt, add_special_tokens=False, max_length=64, truncation=True)
+            if i == len(session) - 1:
                 urc_tokens += [self.tokenizer.eos_token_id]
                 """ 기존 response 입력 """
                 self.positive_tokens = [self.tokenizer.cls_token_id] + urc_tokens + original_token
@@ -137,19 +131,27 @@ class PostLoader(Dataset):
                     random_neg_response = random.choice(self.all_utts)
                     if random_neg_response not in context_utts:
                         break
-                random_neg_response_token = self.tokenizer.encode(random_neg_response, add_special_tokens=False,
-                                                                  max_length=128, truncation=True)
+                random_neg_response_token = self.tokenizer.encode(
+                    random_neg_response, add_special_tokens=False, max_length=64, truncation=True
+                )
                 self.random_tokens = [self.tokenizer.cls_token_id] + urc_tokens + random_neg_response_token
                 """ context negative response 입력 """
                 context_neg_response = random.choice(context_utts)
-                context_neg_response_token = self.tokenizer.encode(context_neg_response, add_special_tokens=False,
-                                                                   max_length=128, truncation=True)
+                context_neg_response_token = self.tokenizer.encode(
+                    context_neg_response, add_special_tokens=False, max_length=64, truncation=True
+                )
                 self.context_neg_tokens = [self.tokenizer.cls_token_id] + urc_tokens + context_neg_response_token
             else:
                 urc_tokens += original_token + [self.tokenizer.sep_token_id]
             context_utts.append(utt)
-        
-        return self.corrupt_tokens, self.output_tokens, self.corrupt_mask_positions, [self.positive_tokens, self.random_tokens, self.context_neg_tokens], [0, 1, 2]
+
+        return (
+            self.corrupt_tokens,
+            self.output_tokens,
+            self.corrupt_mask_positions,
+            [self.positive_tokens, self.random_tokens, self.context_neg_tokens],
+            [0, 1, 2],
+        )
 
     def collate_fn(self, sessions):
         """
@@ -168,7 +170,13 @@ class PostLoader(Dataset):
         MLM = 3개의 입력데이터 (입력데이터별로 길이가 다름)
         URC = 9개의 입력데이터 (context는 길이가 다름, response candidate도 길이가 다름)
         """
-        batch_corrupt_tokens, batch_output_tokens, batch_corrupt_mask_positions, batch_urc_inputs, batch_urc_labels = [], [], [], [], []
+        batch_corrupt_tokens, batch_output_tokens, batch_corrupt_mask_positions, batch_urc_inputs, batch_urc_labels = (
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
         batch_mlm_attentions, batch_urc_attentions = [], []
         # MLM, URC 입력에 대해서 가장 긴 입력 길이를 찾기
         corrupt_max_len, urc_max_len = 0, 0
@@ -179,26 +187,36 @@ class PostLoader(Dataset):
             positive_tokens, random_tokens, context_neg_tokens = urc_inputs
             if max([len(positive_tokens), len(random_tokens), len(context_neg_tokens)]) > urc_max_len:
                 urc_max_len = max([len(positive_tokens), len(random_tokens), len(context_neg_tokens)])
-                
+
         ## padding 토큰을 추가하는 부분
         for session in sessions:
             corrupt_tokens, output_tokens, corrupt_mask_positions, urc_inputs, urc_labels = session
             """ mlm 입력 """
-            batch_corrupt_tokens.append(corrupt_tokens + [self.tokenizer.pad_token_id for _ in range(corrupt_max_len-len(corrupt_tokens))])
-            batch_mlm_attentions.append([1 for _ in range(len(corrupt_tokens))] + [0 for _ in range(corrupt_max_len-len(corrupt_tokens))])
-            
+            batch_corrupt_tokens.append(
+                corrupt_tokens + [self.tokenizer.pad_token_id for _ in range(corrupt_max_len - len(corrupt_tokens))]
+            )
+            batch_mlm_attentions.append(
+                [1 for _ in range(len(corrupt_tokens))] + [0 for _ in range(corrupt_max_len - len(corrupt_tokens))]
+            )
+
             """ mlm 출력 """
-            batch_output_tokens.append(output_tokens + [self.tokenizer.pad_token_id for _ in range(corrupt_max_len-len(corrupt_tokens))])
-            
+            batch_output_tokens.append(
+                output_tokens + [self.tokenizer.pad_token_id for _ in range(corrupt_max_len - len(corrupt_tokens))]
+            )
+
             """ mlm 레이블 """
             batch_corrupt_mask_positions.append(corrupt_mask_positions)
-            
+
             """ urc 입력 """
             # positive_tokens, random_tokens, context_neg_tokens = urc_inputs
-            for urc_input in urc_inputs:                            
-                batch_urc_inputs.append(urc_input + [self.tokenizer.pad_token_id for _ in range(urc_max_len-len(urc_input))])
-                batch_urc_attentions.append([1 for _ in range(len(urc_input))] + [0 for _ in range(urc_max_len-len(urc_input))])
-            
+            for urc_input in urc_inputs:
+                batch_urc_inputs.append(
+                    urc_input + [self.tokenizer.pad_token_id for _ in range(urc_max_len - len(urc_input))]
+                )
+                batch_urc_attentions.append(
+                    [1 for _ in range(len(urc_input))] + [0 for _ in range(urc_max_len - len(urc_input))]
+                )
+
             """ urc 레이블 """
             batch_urc_labels += urc_labels
 
